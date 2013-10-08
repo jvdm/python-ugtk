@@ -1,0 +1,92 @@
+python-ugtk is a functional layer upon pygtk.  The purpose is provide
+a more maintanable, clean and organized code for GUI.
+
+The pyugtk layer is based on the concept of actions.  An ugtk action
+is a series of gtk methods called on a widget.  And each widget
+determines a set of actions that it can apply.
+
+To apply actions you must use a ugtk method.  There are two of them:
+
+    ugtk.new(gtkclass, **actions)
+
+    ugtk.set(gtkwidget, **actions)
+
+The first is used when you have no widget yet and you want it created.
+The second serves only the purpose of applying actions.
+
+To specify action to methods you use the kwargs syntax, where the key
+is the action name and the value is the action parameter (which can be
+any python object).
+
+Some actions are available for both methods (e.g. text=str is provided
+both for ugtk.new and ugtk.add on gtk.Label -- which actually calls
+gtk.Label.set_text(str)).  Others are only available for each method.
+Some actions for both methods may behave differently depending on
+which method they are being applied from.
+
+To better organize actions we can group them by functionality:
+
+- set actions: actions that in practice just call
+  widget.set_ACTIONNAME on methods passing their value as parameter.
+
+- wrapper actions: actions that generate a series of methods call on
+  the widget. E.g. gtkset(hbox, child_tight=[label, entry]) will call
+  gtk.Box.pack_start(0, label) and gtk.Box.pack_start(0, entry)
+
+To provide a functional paradigm each ugtk method returns the widget
+being manipulated, so users can do things like:
+
+>>> win = ugtk.new(gtk.Window,
+>>>                title="pyugtk 'Hello, World'",
+>>>                child=ugtk.new(gtk.Label,
+>>>                               text="Hello, World!"))
+
+
+How to add your own dispatchers
+================================
+
+In case you've a class you would like to apply ugtk actions first you
+need to create inherit from ugtk.dispatchers.base.ActionDispatcher.
+Then you need to register it so ugtk will call it to dispatch actions:
+
+>>> import ugtk
+>>> import ugtk.dispatcher
+>>>
+>>> class MyDispatcher(ugtk.dispatchers.base.ActionDispatcher):
+...     pass # ... implement the dispatcher methods and callbacks
+...
+>>> class MyClass:
+...     pass # your new widget
+...
+>>> ugtk.dispatcher.register(MyClass, MyDispatcher)
+>>>
+
+Now you can:
+
+>>> myobj = ugtk.new(MyClass, action='My action parameter')
+>>> ugtk.set(myobj, another_action='Another action parameter')
+>>>
+
+If MyClass inherits from gtk classes (in fact any other registered
+class) ugtk you will be able to use actions from those classes aswell.
+
+>>> import gtk
+>>> class MyWindow(gtk.Window):
+...     pass # you class implemetation here...
+...
+>>> # register MyWindow as a ugtk dispatcher...
+>>> ugtk.new(MyWindow,
+...          action='You action parameter',
+...          title="My Window Title!")
+...
+>>>
+
+gtkadd
+=======
+
+Used to create the widget.  Actions
+
+gtk.Label
+---------
+
+
