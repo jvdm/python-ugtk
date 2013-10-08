@@ -1,7 +1,7 @@
 # -*- Mode: Python; coding: utf-8 -*-
 
 ##
-## Copyright (C) 2010 Mandriva S.A. <http://www.mandriva.com>
+## Copyright (C) 2013 J. Victor Martins <jvdm@sdf.org>
 ## All rights reserved
 ##
 ## This program is free software: you can redistribute it and/or modify it
