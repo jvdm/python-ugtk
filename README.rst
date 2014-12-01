@@ -15,7 +15,7 @@ each widget is based on its inheritance.
 
 To apply actions you must use a ugtk method, by specifying a kwargs
 for each action (where the key is the action name, the value the
-action argument).  There are currently two of them:
+action argument).  There are currently two of them::
 
     ugtk.new(gtkclass, **actions)
 
@@ -28,7 +28,7 @@ The second serves only the purpose of applying actions.
 
 Actions change their behaviour depending on the ugtk method used to
 perform them.  For example, specifiying ``children=list`` action on a
-`Gtk.HBox' object using ugtk.add() is different from using ugtk.set()
+``Gtk.HBox`` object using ugtk.add() is different from using ugtk.set()
 (the later will reset the box childrens, while the former will always
 append).
 
@@ -51,9 +51,8 @@ wrapper actions
   entry)``.
 
 To provide a functional paradigm each ugtk method returns the widget
-being manipulated, so users can do things like:
+being manipulated, so users can do things like::
 
-::
     win = ugtk.new(
         Gtk.Window,
         title="ugtk 'Hello, World' window",
