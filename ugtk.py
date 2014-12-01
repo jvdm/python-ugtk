@@ -65,7 +65,7 @@ def _dispatch(method, actions, *, klass=None, widget=None):
 
     if actions:
         # Some actions were not used, currently this is an error:
-        raise ValueError("Unknow action(s) for method '%s' on %s: %s."
+        raise ValueError("unknown action(s) for method '%s' on %s: %s."
                          % (method, klass.__name__, ', '.join(actions)))
 
     return widget
@@ -163,7 +163,7 @@ class Handler:
 # Default Handlers
 #
 
-@handler(GObject)
+@handler(GObject.Object)
 class GObjectHandler(Handler):
     def on_action__connect(self, widget, signals):
         if type(signals) != dict:
@@ -307,7 +307,7 @@ class Box(Handler):
             pack_args = {}
             if type(child) is tuple:
                 (child, pack_args) = child
-                for k,v in self.pack_args:
+                for k,v in self.pack_args.items():
                     if k not in pack_args:
                         pack_args[k] = v
             else:
