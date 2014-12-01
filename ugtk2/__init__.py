@@ -17,67 +17,160 @@
 # Contributor(s):	J. Victor Martins <jvdm@sdf.org>
 #
 
+
 """ugtk is a module providing a functional layer upon PyGObject/GTK+."""
 
 
-class Actions(object):
-    def __init__(self, method, actions):
+import sys
+import re
+import inspect
+import functools
+from gi.repository import GObject, Gtk
+
+
+_handlers_table = {}
+
+
+def _dispatch(method, actions, *, klass=None, widget=None):
+    """Dispatch actions over to GTK class/widget.
+    
+    Each action is to be applied in the class or a parent class in
+    MRO, as long as if there is an action handler available for that
+    class.
+
+    """
+
+    if bool(klass) == bool(widget):
+        raise ValueError("You can't specify both klass and widget")
+
+    if widget:
+        klass = type(widget)
+
+    for subclass in klass.__mro__:
+        try:
+            handler = _handlers_table[subclass](method, actions, widget)
+        except KeyError:
+            # don't apply actions to a class that doesn't have an
+            # agent, but ignore in the case of subclasses
+            if subclass == klass:
+                raise ValueError("missing handler for class: %s"
+                                 % klass.__name__)
+        else:
+            widget = agent()
+
+    if actions:
+        # Some actions were not used, currently this is an error:
+        raise ValueError("Unknow action(s) for '%s' on %s: %s."
+                         % (method, klass.__name__, ', '.join(actions)))
+
+    return widget
+
+
+def new(klass, **actions):
+    return _dispatch('new', actions, klass=klass)
+
+def set(widget, **actions):
+    return _dispatch('set', actions, widget=widget)
+
+def add(widget, **actions):
+    return _dispatch('add', actions, widget=widget)
+
+
+def handler(gtk_cls):
+    """Class decorator for ugtk handler classes."""
+    @functools.wraps(cls)
+    def decorator(cls):
+        cls._klass = gtk_cls
+        if hasattr(cls, '_setters'):
+            for action, function in list(cls._setters.items()):
+                if not function:
+                    function = 'set_%s' % action
+                if not hasattr(gtk_cls, function):
+                    raise ValueError(
+                        'handler: %s missing set action function: %s'
+                        % (gtk_cls.__name__, function))
+                cls._setters[action] = function
+        _agent_types[gtk_cls] = cls
+        return cls
+    return decorator
+
+
+class Handler(object):
+
+    _klass = None
+
+    def __init__(self, method, actions, widget):
         self.method = method
-        self.actions = actions
+        self.action_items = []
+        for action in list(actions.keys()):
+            for obj, attr in [
+                    ( widget, self._setters.get(action, 'set_%s' % action) ),
+                    ( self, 'on_action__%s' % action ) ]:
+                try:
+                    self.action_items.append(
+                        ( getattr(target, name), actions.pop(action) ))
+                except KeyError:
+                    pass
+        if method == 'new' and widget is None:
+            self.widget = self.on_create()
+        else:
+            self.widget = widget
 
+    def __call__(self):
+        self.on_pre()
+        for func, args in self.action_items:
+            if args is not tuple:
+                args = (args,)
+            func(*args)
+        self.on_post()
+        return self.widget
 
-class ActionHandler(object):
-    """Represent a ugtk action handler class."""
+    def on_create(self):
+        return self.klass()
 
-    signals = []
-    set_actions = {}
-
-    def handle(self, widget, actions):
-        """Apply actions to the widget the method."""
-
-        self.on_start_dispatch(method, widget, actions)
-        self.__dispatch_set_action(widget, actions)
-        # Dispatch the remaining actions to callbacks, ignore if they
-        # don't exist ...
-        for action in actions.keys():
-            callback_name = 'on_%s__callback' % action
-            if hasattr(self, callback_name):
-                callback = getattr(self, callback_name)
-                callback(method, widget, actions.pop(action))
-        self.on_finalize_dispatch(method, widget, actions)
-
-    def __dispatch_set_action(self, widget, actions):
-        for action in self.set_actions:
-            if action in actions:
-                method = self.set_actions[action]
-                if not method:
-                    method = "set_%s" % action
-                getattr(widget, method)(actions.pop(action))
-
-    def on_start_dispatch(self, method, widget, actions):
-        """Called before any other operation during a dispatch."""
+    def on_pre(self):
         pass
 
-    def on_finalize_dispatch(self, method, widget, actions):
-        """Called after all other operations during a dispatch."""
+    def on_post(self):
         pass
 
-    def on_create(self, klass, actions):
-        """Called to create an object of the class."""
-        raise ValueError("creating widget for class %s is not supported"
-                         % klass.__name__)
 
+@handler(GObject)
+class GObjectHandler(Handler):
+    def on_action__connect(self, signals):
+        if type(signals) != dict:
+            raise ValueError("'connect' action arg must be a dict")
+        for signal,  in list(signals.items()):
+            self.widget.connect(signal, signals.pop(signal))
 
-_dispatchers = {}
+@handler(Gtk.Widget)
+class WidgetHandler(Agent):
+    def on_pre(self):
+        if self.method == 'new':
+            self.widget.show()
 
-def register(gtk_cls, dispatcher_cls):
-    """Register a new dispatcher for the selected GTK class."""
-    try:
-        registered[gtk_cls]
-    except KeyError:
-    if not issubclass(dispatcher_cls, ActionDispatcher):
-        raise ValueError('%s must be a subclass of %s to be registered as '
-                         'a ugtk action dispatcher.'
-                         % (klass.__name__, ActionDispatcher.__name__))
+        if 'hide' in self.actions and 'show' in self.actions:
+            raise ValueError("can't have both 'hide' and 'show' actions")
 
-    registered[klass] = dispatcher_class
+    def on_action__hide(self, value):
+        if value:
+            widget.hide()
+        else:
+            widget.show()
+
+    def on_action__show(self, value):
+        if value:
+            widget.show()
+        else:
+            widget.hide()
+
+@handler(Gtk.Container)
+class ContainerHandler(Handler):
+    
+    _setters = {'border_width': None, 'child': 'add'}
+
+@handler(Gtk.Label)
+class LabelHandler(Hanlder):
+    
+    _setters = {'text': None, 'selectable': None}
+
